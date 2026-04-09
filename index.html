@@ -746,81 +746,75 @@
     });
   }
 
-  // --- Build .eqp XML (real WWB format) ---
+  // --- Build .eqp XML (formato real basado en Perfil_V0_Full.eqp) ---
   function buildEqp(entries, profileName) {
-    const allFreqs = entries.map(e => e.freq);
-    const minKhz = Math.floor(Math.min(...allFreqs) * 1000) - 5000;
-    const maxKhz = Math.ceil(Math.max(...allFreqs) * 1000) + 5000;
-    const totalChannels = entries.length;
     const now = new Date();
     const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
-    const dateStr = days[now.getDay()] + '. ' + months[now.getMonth()] + '. ' + now.getDate() + ' ' + now.getFullYear();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const dateStr = days[now.getDay()] + ' ' + months[now.getMonth()] + ' ' + now.getDate() + ' ' + now.getFullYear();
     const timeStr = now.toTimeString().slice(0,8);
 
-    return `<equipment_profile version="2.0" date="${dateStr}" appl_version="6.15.4.13" source="SoundBase2WWB" time="${timeStr}">
+    // Una frecuencia por entrada, en KHz
+    const freqListXml = entries.map(e => {
+      const khz = Math.round(e.freq * 1000);
+      return `                    <freq>${khz}</freq>`;
+    }).join('\n');
+
+    return `<equipment_profile time="${timeStr}" date="${dateStr}" source="SoundBase2WWB" version="2.0" appl_version="7.8.0.66">
     <device>
         <identification>
             <manufacturer>SoundBase</manufacturer>
             <model>${profileName}</model>
-            <band>${profileName}</band>
+            <band>Full</band>
             <type>Microphone</type>
         </identification>
         <device_parameters>
             <tuning_capability version="0.0.0.1" id="${uuid()}">
-                <range freq_units="KHz">
-                    <start>0</start>
-                    <end>0</end>
-                    <step>25</step>
-                </range>
-                <sub_range_list freq_units="KHz">
-                    <sub_range>
-                        <start>${minKhz}</start>
-                        <end>${maxKhz}</end>
-                    </sub_range>
-                </sub_range_list>
+                <freq_list freq_units="KHz">
+${freqListXml}
+                </freq_list>
             </tuning_capability>
-            <channels>${totalChannels}</channels>
+            <channels>1</channels>
         </device_parameters>
         <compat_profiles units="kHz">
-            <compat_profile version="0.0.0.1" synthesizable="1" imd_source="1" id="${uuid()}" name="Robust">
+            <compat_profile version="0.0.0.1" imd_source="0" id="${uuid()}" name="Robust" synthesizable="1">
                 <spacing freq_units="KHz">
-                    <ch_ch>500</ch_ch>
-                    <imd_2t3o>400</imd_2t3o>
+                    <ch_ch>1</ch_ch>
+                    <imd_2t3o>0</imd_2t3o>
                     <imd_2t5o>0</imd_2t5o>
                     <imd_2t7o>0</imd_2t7o>
                     <imd_2t9o>0</imd_2t9o>
-                    <imd_3t3o>100</imd_3t3o>
+                    <imd_3t3o>0</imd_3t3o>
                 </spacing>
                 <filter type="0">
-                    <filter_start>-200000</filter_start>
-                    <filter_end>200000</filter_end>
+                    <filter_start>0</filter_start>
+                    <filter_end>0</filter_end>
                     <filter_center>0</filter_center>
                 </filter>
             </compat_profile>
-            <compat_profile version="0.0.0.1" synthesizable="1" imd_source="1" id="${uuid()}" name="Standard">
+            <compat_profile version="0.0.0.1" imd_source="0" id="${uuid()}" name="Standard" synthesizable="1">
                 <spacing freq_units="KHz">
-                    <ch_ch>400</ch_ch>
-                    <imd_2t3o>250</imd_2t3o>
+                    <ch_ch>1</ch_ch>
+                    <imd_2t3o>0</imd_2t3o>
                     <imd_2t5o>0</imd_2t5o>
                     <imd_2t7o>0</imd_2t7o>
                     <imd_2t9o>0</imd_2t9o>
-                    <imd_3t3o>200</imd_3t3o>
+                    <imd_3t3o>0</imd_3t3o>
                 </spacing>
                 <filter type="0">
-                    <filter_start>-150000</filter_start>
-                    <filter_end>150000</filter_end>
+                    <filter_start>0</filter_start>
+                    <filter_end>0</filter_end>
                     <filter_center>0</filter_center>
                 </filter>
             </compat_profile>
-            <compat_profile version="0.0.0.1" synthesizable="1" imd_source="1" id="${uuid()}" name="More Frequencies">
+            <compat_profile version="0.0.0.1" imd_source="0" id="${uuid()}" name="More Frequencies" synthesizable="1">
                 <spacing freq_units="KHz">
-                    <ch_ch>300</ch_ch>
-                    <imd_2t3o>200</imd_2t3o>
+                    <ch_ch>1</ch_ch>
+                    <imd_2t3o>0</imd_2t3o>
                     <imd_2t5o>0</imd_2t5o>
                     <imd_2t7o>0</imd_2t7o>
                     <imd_2t9o>0</imd_2t9o>
-                    <imd_3t3o>175</imd_3t3o>
+                    <imd_3t3o>0</imd_3t3o>
                 </spacing>
                 <filter type="0">
                     <filter_start>-100000</filter_start>
