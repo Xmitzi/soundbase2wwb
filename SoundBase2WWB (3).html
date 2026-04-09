@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SoundBase → WWB Converter</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0b;
+    --surface: #111113;
+    --surface2: #18181c;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0efe8;
+    --muted: #6b6a65;
+    --accent: #e8ff47;
+    --accent-dim: rgba(232,255,71,0.12);
+    --accent-text: #c8de20;
+    --danger: #ff4d4d;
+    --success: #4dff91;
+    --success-dim: rgba(77,255,145,0.1);
+    --mono: 'DM Mono', monospace;
+    --display: 'Syne', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--display);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* grid bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 4rem;
+  }
+
+  /* Header */
+  header { margin-bottom: 3rem; }
+
+  .logo-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .logo-icon svg { width: 20px; height: 20px; }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-top: 4px;
+  }
+
+  .pill {
+    display: inline-block;
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 100px;
+    background: var(--accent-dim);
+    color: var(--accent-text);
+    border: 1px solid rgba(232,255,71,0.2);
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+
+  /* Steps */
+  .steps {
+    display: flex;
+    gap: 0;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .step {
+    flex: 1;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    border-right: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.2s, background 0.2s;
+  }
+
+  .step:last-child { border-right: none; }
+
+  .step.active {
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .step.done {
+    color: var(--success);
+  }
+
+  .step-num {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .step.done .step-num {
+    background: var(--success);
+    border-color: var(--success);
+    color: #000;
+    font-weight: 700;
+  }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 1px dashed var(--border2);
+    border-radius: 16px;
+    padding: 4rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .drop-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(232,255,71,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .drop-zone:hover, .drop-zone.over {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .drop-icon {
+    width: 56px; height: 56px;
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 1.25rem;
+    font-size: 24px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .drop-zone:hover .drop-icon, .drop-zone.over .drop-icon {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .drop-title {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+
+  .drop-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  .hint-box {
+    margin-top: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+  }
+
+  .hint-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .hint-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  .hint-step-n {
+    color: var(--accent-text);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  /* Section label */
+  .section-label {
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* Input */
+  .field { margin-bottom: 1.25rem; }
+
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .field input {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: var(--display);
+    font-weight: 600;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .field input:focus { border-color: var(--accent); }
+
+  /* Stats */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+
+  .stat-val {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+    font-family: var(--mono);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  /* Band list */
+  .band-list {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .band-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  .band-row:last-child { border-bottom: none; }
+  .band-row:hover { background: var(--surface2); }
+
+  .band-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .band-freqs-preview {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .band-count {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--accent-text);
+    background: var(--accent-dim);
+    padding: 3px 9px;
+    border-radius: 100px;
+    flex-shrink: 0;
+  }
+
+  /* Output box */
+  .output-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .output-filename {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--accent-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .output-filename::before {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  textarea {
+    width: 100%;
+    height: 200px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.6;
+    padding: 14px 16px;
+    background: var(--surface);
+    color: var(--muted);
+    border: none;
+    outline: none;
+    resize: vertical;
+    display: block;
+  }
+
+  textarea::selection { background: var(--accent-dim); }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-family: var(--display);
+    font-weight: 700;
+    border-radius: 10px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    letter-spacing: 0.01em;
+  }
+
+  .btn:hover { background: var(--surface2); border-color: var(--border2); }
+  .btn:active { transform: scale(0.98); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-size: 14px;
+    padding: 12px 24px;
+  }
+
+  .btn-primary:hover { background: #d4e83e; border-color: #d4e83e; }
+
+  .btn-success {
+    border-color: var(--success);
+    color: var(--success);
+    background: var(--success-dim);
+  }
+
+  .btn-ghost {
+    border-color: transparent;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  .btn-ghost:hover { color: var(--text); background: var(--surface); }
+
+  /* Notice */
+  .notice {
+    background: rgba(232,255,71,0.06);
+    border: 1px solid rgba(232,255,71,0.2);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 1.5rem;
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--accent-text);
+    line-height: 1.6;
+  }
+
+  .notice strong { font-weight: 500; color: var(--accent); }
+
+  /* How-to steps */
+  .how-to {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .how-to-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .how-to-row:last-child { border-bottom: none; }
+
+  .how-to-n {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    border: 1px solid rgba(232,255,71,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--accent-text);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .how-to-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 3px;
+  }
+
+  .how-to-sub {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* File input */
+  input[type="file"] { display: none; }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1.5rem 0;
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--muted);
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate { animation: fadeUp 0.3s ease both; }
+
+  @media (max-width: 480px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .steps { display: none; }
+    h1 { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo-row">
+      <div class="logo-icon">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="9" width="3" height="8" rx="1" fill="#000"/>
+          <rect x="7" y="5" width="3" height="12" rx="1" fill="#000"/>
+          <rect x="12" y="2" width="3" height="15" rx="1" fill="#000"/>
+          <rect x="17" y="7" width="1" height="10" rx="0.5" fill="#000"/>
+        </svg>
+      </div>
+      <h1>SoundBase → WWB <span class="pill">.eqp</span></h1>
+    </div>
+    <p class="subtitle">Convert SoundBase frequency CSV to Wireless Workbench equipment profile</p>
+  </header>
+
+  <div class="steps" id="steps">
+    <div class="step active" id="step1"><div class="step-num">1</div> Upload CSV</div>
+    <div class="step" id="step2"><div class="step-num">2</div> Review</div>
+    <div class="step" id="step3"><div class="step-num">3</div> Copy .eqp</div>
+  </div>
+
+  <!-- SCREEN 1: Upload -->
+  <div id="screen-upload" class="animate">
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-icon">📂</div>
+      <p class="drop-title">Drop your SoundBase CSV here</p>
+      <p class="drop-sub">or click to browse files</p>
+      <input type="file" id="fileInput" accept=".csv" />
+    </div>
+
+    <div class="hint-box" style="margin-top:1.5rem">
+      <p class="hint-label">How to export from SoundBase</p>
+      <div class="hint-step"><span class="hint-step-n">01</span> Open your project in SoundBase Coord</div>
+      <div class="hint-step"><span class="hint-step-n">02</span> Project Menu (⋯) → Download Frequency List (CSV)</div>
+      <div class="hint-step"><span class="hint-step-n">03</span> Drop that file here — the app does the rest</div>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: Review + Generate -->
+  <div id="screen-review" style="display:none" class="animate">
+
+    <div id="file-info" style="display:flex;align-items:center;gap:10px;margin-bottom:1.5rem;">
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;"></div>
+      <span id="file-name-label" style="font-size:13px;font-family:var(--mono);color:var(--muted)"></span>
+      <button class="btn btn-ghost" style="margin-left:auto;padding:4px 10px;font-size:11px;" onclick="reset()">← Change file</button>
+    </div>
+
+    <div class="stats" id="stats-grid"></div>
+
+    <div class="field">
+      <label>Device / profile name in WWB</label>
+      <input type="text" id="profileName" value="Festival Frequencies" />
+    </div>
+
+    <p class="section-label">Bands detected → will become groups in WWB</p>
+    <div class="band-list" id="band-list"></div>
+
+    <button class="btn btn-primary" onclick="goToOutput()">Generate .eqp file →</button>
+  </div>
+
+  <!-- SCREEN 3: Output -->
+  <div id="screen-output" style="display:none" class="animate">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1.5rem;">
+      <div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;"></div>
+      <span id="output-summary" style="font-size:13px;font-family:var(--mono);color:var(--muted)"></span>
+      <button class="btn btn-ghost" style="margin-left:auto;padding:4px 10px;font-size:11px;" onclick="goToReview()">← Edit</button>
+    </div>
+
+    <div class="notice">
+      <strong>Save this as:</strong> <span id="eqp-filename"></span><br>
+      Copy the content below → paste in Notepad / TextEdit → save with <strong>.eqp</strong> extension
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="downloadBtn" onclick="downloadEqp()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download .eqp
+      </button>
+      <button class="btn" id="copyBtn" onclick="copyEqp()" style="padding:10px 18px;">Copy to clipboard</button>
+    </div>
+
+    <div class="output-box">
+      <div class="output-header">
+        <span class="output-filename" id="output-header-name"></span>
+        <span style="font-size:11px;font-family:var(--mono);color:var(--muted)">preview</span>
+      </div>
+      <textarea id="eqpOutput" readonly></textarea>
+    </div>
+
+    <p class="section-label" style="margin-bottom:12px;">How to import in Wireless Workbench</p>
+    <div class="how-to">
+      <div class="how-to-row">
+        <div class="how-to-n">1</div>
+        <div>
+          <p class="how-to-title">Click "Download .eqp"</p>
+          <p class="how-to-sub">The file downloads directly as ProfileName.eqp — ready to import, no extra steps</p>
+        </div>
+      </div>
+      <div class="how-to-row">
+        <div class="how-to-n">2</div>
+        <div>
+          <p class="how-to-title">Import into Wireless Workbench</p>
+          <p class="how-to-sub">Tools → Equipment Profiles → click + → Import → select your .eqp file</p>
+        </div>
+      </div>
+      <div class="how-to-row">
+        <div class="how-to-n">3</div>
+        <div>
+          <p class="how-to-title">Add to inventory as a device</p>
+          <p class="how-to-sub">Add new device → Manufacturer: SoundBase → Model: <span id="model-hint"></span></p>
+        </div>
+      </div>
+      <div class="how-to-row">
+        <div class="how-to-n">4</div>
+        <div>
+          <p class="how-to-title">Frequencies grouped by band</p>
+          <p class="how-to-sub">In Frequency Coordination you will see all freqs grouped by band name — one group per artist / band</p>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn" onclick="reset()">← Convert another file</button>
+  </div>
+
+  <footer>SoundBase → WWB Converter &nbsp;·&nbsp; built for live sound techs</footer>
+</div>
+
+<script>
+  let parsedRows = [];
+  let currentFile = '';
+
+  // --- Drop zone ---
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('over');
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file) return;
+    currentFile = file.name;
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: r => {
+        parsedRows = r.data;
+        showReview();
+      }
+    });
+  }
+
+  // --- Data processing ---
+  function getEntries(rows) {
+    return rows.map(r => {
+      const f = parseFloat((r.freq || '').replace(/[^\d.]/g, ''));
+      const band = (r.zoneName || r.siteName || '').trim();
+      return (!isNaN(f) && f > 0 && band) ? { freq: f, band } : null;
+    }).filter(Boolean);
+  }
+
+  function getBands(entries) {
+    const map = {};
+    entries.forEach(e => {
+      if (!map[e.band]) map[e.band] = [];
+      map[e.band].push(e.freq);
+    });
+    return map;
+  }
+
+  // --- UUID generator ---
+  function uuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  // --- Build .eqp XML (real WWB format) ---
+  function buildEqp(entries, profileName) {
+    const allFreqs = entries.map(e => e.freq);
+    const minKhz = Math.floor(Math.min(...allFreqs) * 1000) - 5000;
+    const maxKhz = Math.ceil(Math.max(...allFreqs) * 1000) + 5000;
+    const totalChannels = entries.length;
+    const now = new Date();
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    const dateStr = days[now.getDay()] + '. ' + months[now.getMonth()] + '. ' + now.getDate() + ' ' + now.getFullYear();
+    const timeStr = now.toTimeString().slice(0,8);
+
+    return `<equipment_profile version="2.0" date="${dateStr}" appl_version="6.15.4.13" source="SoundBase2WWB" time="${timeStr}">
+    <device>
+        <identification>
+            <manufacturer>SoundBase</manufacturer>
+            <model>${profileName}</model>
+            <band>${profileName}</band>
+            <type>Microphone</type>
+        </identification>
+        <device_parameters>
+            <tuning_capability version="0.0.0.1" id="${uuid()}">
+                <range freq_units="KHz">
+                    <start>0</start>
+                    <end>0</end>
+                    <step>25</step>
+                </range>
+                <sub_range_list freq_units="KHz">
+                    <sub_range>
+                        <start>${minKhz}</start>
+                        <end>${maxKhz}</end>
+                    </sub_range>
+                </sub_range_list>
+            </tuning_capability>
+            <channels>${totalChannels}</channels>
+        </device_parameters>
+        <compat_profiles units="kHz">
+            <compat_profile version="0.0.0.1" synthesizable="1" imd_source="1" id="${uuid()}" name="Robust">
+                <spacing freq_units="KHz">
+                    <ch_ch>500</ch_ch>
+                    <imd_2t3o>400</imd_2t3o>
+                    <imd_2t5o>0</imd_2t5o>
+                    <imd_2t7o>0</imd_2t7o>
+                    <imd_2t9o>0</imd_2t9o>
+                    <imd_3t3o>100</imd_3t3o>
+                </spacing>
+                <filter type="0">
+                    <filter_start>-200000</filter_start>
+                    <filter_end>200000</filter_end>
+                    <filter_center>0</filter_center>
+                </filter>
+            </compat_profile>
+            <compat_profile version="0.0.0.1" synthesizable="1" imd_source="1" id="${uuid()}" name="Standard">
+                <spacing freq_units="KHz">
+                    <ch_ch>400</ch_ch>
+                    <imd_2t3o>250</imd_2t3o>
+                    <imd_2t5o>0</imd_2t5o>
+                    <imd_2t7o>0</imd_2t7o>
+                    <imd_2t9o>0</imd_2t9o>
+                    <imd_3t3o>200</imd_3t3o>
+                </spacing>
+                <filter type="0">
+                    <filter_start>-150000</filter_start>
+                    <filter_end>150000</filter_end>
+                    <filter_center>0</filter_center>
+                </filter>
+            </compat_profile>
+            <compat_profile version="0.0.0.1" synthesizable="1" imd_source="1" id="${uuid()}" name="More Frequencies">
+                <spacing freq_units="KHz">
+                    <ch_ch>300</ch_ch>
+                    <imd_2t3o>200</imd_2t3o>
+                    <imd_2t5o>0</imd_2t5o>
+                    <imd_2t7o>0</imd_2t7o>
+                    <imd_2t9o>0</imd_2t9o>
+                    <imd_3t3o>175</imd_3t3o>
+                </spacing>
+                <filter type="0">
+                    <filter_start>-100000</filter_start>
+                    <filter_end>100000</filter_end>
+                    <filter_center>0</filter_center>
+                </filter>
+            </compat_profile>
+        </compat_profiles>
+    </device>
+</equipment_profile>`;
+  }
+
+  // --- Screens ---
+  function setStep(n) {
+    [1,2,3].forEach(i => {
+      const el = document.getElementById('step'+i);
+      el.classList.remove('active','done');
+      if (i < n) el.classList.add('done');
+      if (i === n) el.classList.add('active');
+      if (i < n) el.querySelector('.step-num').textContent = '✓';
+      else el.querySelector('.step-num').textContent = i;
+    });
+  }
+
+  function show(id) {
+    ['screen-upload','screen-review','screen-output'].forEach(s => {
+      const el = document.getElementById(s);
+      el.style.display = 'none';
+      el.classList.remove('animate');
+    });
+    const target = document.getElementById(id);
+    target.style.display = 'block';
+    requestAnimationFrame(() => target.classList.add('animate'));
+  }
+
+  function showReview() {
+    const entries = getEntries(parsedRows);
+    const bands = getBands(entries);
+    const bandNames = Object.keys(bands);
+
+    document.getElementById('file-name-label').textContent = currentFile + ' · ' + entries.length + ' frequencies';
+
+    // Stats
+    const statsGrid = document.getElementById('stats-grid');
+    statsGrid.innerHTML = [
+      ['Total freq', entries.length],
+      ['Bands', bandNames.length],
+      ['WWB groups', bandNames.length]
+    ].map(([l,v]) => `
+      <div class="stat">
+        <div class="stat-val">${v}</div>
+        <div class="stat-label">${l}</div>
+      </div>`).join('');
+
+    // Band list
+    const bandList = document.getElementById('band-list');
+    bandList.innerHTML = bandNames.map(b => {
+      const freqs = bands[b];
+      const preview = freqs.slice(0,3).map(f => f.toFixed(3)).join(' · ') + (freqs.length > 3 ? ' ...' : '');
+      return `<div class="band-row">
+        <div>
+          <div class="band-name">${b}</div>
+          <div class="band-freqs-preview">${preview}</div>
+        </div>
+        <div class="band-count">${freqs.length} freq</div>
+      </div>`;
+    }).join('');
+
+    setStep(2);
+    show('screen-review');
+  }
+
+  function goToOutput() {
+    const entries = getEntries(parsedRows);
+    const profileName = document.getElementById('profileName').value.trim() || 'Festival Frequencies';
+    const eqp = buildEqp(entries, profileName);
+    const filename = profileName.replace(/[^a-zA-Z0-9_\- ]/g,'').trim() + '.eqp';
+
+    document.getElementById('eqpOutput').value = eqp;
+    document.getElementById('eqp-filename').textContent = filename;
+    document.getElementById('output-header-name').textContent = filename;
+    document.getElementById('output-summary').textContent = profileName + ' · ' + entries.length + ' frequencies';
+    document.getElementById('model-hint').textContent = profileName;
+
+    setStep(3);
+    show('screen-output');
+  }
+
+  function goToReview() {
+    setStep(2);
+    show('screen-review');
+  }
+
+  function reset() {
+    parsedRows = [];
+    currentFile = '';
+    document.getElementById('fileInput').value = '';
+    setStep(1);
+    show('screen-upload');
+  }
+
+  function downloadEqp() {
+    const content = document.getElementById('eqpOutput').value;
+    const profileName = document.getElementById('profileName').value.trim() || 'Festival Frequencies';
+    const filename = profileName.replace(/[^a-zA-Z0-9_\- ]/g,'').trim() + '.eqp';
+    const blob = new Blob([content], { type: 'application/xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    const btn = document.getElementById('downloadBtn');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '✓ Downloaded!';
+    btn.classList.add('btn-success');
+    btn.style.background = 'var(--success-dim)';
+    btn.style.borderColor = 'var(--success)';
+    btn.style.color = 'var(--success)';
+    setTimeout(() => {
+      btn.innerHTML = orig;
+      btn.classList.remove('btn-success');
+      btn.style.background = '';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }, 2500);
+  }
+
+  function copyEqp() {
+    const ta = document.getElementById('eqpOutput');
+    ta.select();
+    document.execCommand('copy');
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('btn-success');
+    setTimeout(() => {
+      btn.textContent = 'Copy to clipboard';
+      btn.classList.remove('btn-success');
+    }, 2500);
+  }
+</script>
+</body>
+</html>
